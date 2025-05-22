@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Token Analyzer: Text vs. PDF",
+  "description": "A web application to analyze and compare token usage when sending a story to the Gemini API as plain text versus as a PDF document. This helps understand the impact of multimodal input formats on token counts.",
+  "requestFramePermissions": []
+}
