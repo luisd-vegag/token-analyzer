@@ -8,6 +8,7 @@ export interface ChatMessage {
   content: string;
   isStreaming?: boolean;
   error?: boolean;
+  tokenDetails?: ChatTokenDetails | null;
 }
 
 // Updated to include cached tokens, matches AppChatTokenDetails
@@ -28,11 +29,11 @@ interface ChatBoxProps {
   onSendMessage: (message: string) => void;
   isLoading: boolean;
   isDisabled: boolean;
-  placeholderText?: string; 
+  placeholderText?: string;
   error: string | null;
   onCloseError: () => void;
   onCancel?: () => void;
-  tokenDetails?: ChatTokenDetails | null; 
+  tokenDetails?: ChatTokenDetails | null;
 }
 
 export const ChatBox: React.FC<ChatBoxProps> = ({
@@ -49,14 +50,25 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
 }) => {
   const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  const scrollToBottom = (force: boolean = false) => {
+    if (messagesEndRef.current && chatContainerRef.current) {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+      const atBottomThreshold = 100; 
+      const isAtBottom = scrollHeight - scrollTop - clientHeight <= atBottomThreshold;
+
+      if (force || isAtBottom) {
+        messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }
   };
 
   useEffect(() => {
     if (messages.length > 0) {
-      scrollToBottom();
+      const lastMessage = messages[messages.length - 1];
+      const shouldForceScroll = lastMessage.role === 'model' || (lastMessage.role === 'user' && messages.length === 1);
+      scrollToBottom(shouldForceScroll);
     }
   }, [messages]);
 
@@ -69,6 +81,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
     if (!inputValue.trim() || isLoading || isDisabled) return;
     onSendMessage(inputValue.trim());
     setInputValue('');
+    scrollToBottom(true);
   };
 
   const handleKeyPress = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -96,7 +109,7 @@ export const ChatBox: React.FC<ChatBoxProps> = ({
         </div>
       )}
 
-      <div className="flex-grow p-4 space-y-4 overflow-y-auto bg-slate-900/30 min-h-[200px] max-h-[350px]">
+      <div ref={chatContainerRef} className="flex-grow p-4 space-y-4 overflow-y-auto bg-slate-900/30 min-h-[200px] max-h-[350px]">
         {messages.length === 0 && !isLoading && (
           <p className="text-slate-500 text-center py-4">
             {emptyStateMessage}
