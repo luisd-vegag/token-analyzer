@@ -2,6 +2,12 @@
 
 A web application that analyzes and compares token usage when sending content to Google's Gemini API in different formats - plain text versus PDF documents. This tool helps developers and researchers understand the impact of multimodal input formats on token consumption and API costs.
 
+## 🌐 Try It Online
+
+You can use the app directly at: [https://tokenanalyzer.luisvega.me](https://tokenanalyzer.luisvega.me)
+
+No installation required — just enter your Gemini API key and start analyzing!
+
 ## 🎯 Purpose
 
 Understanding token usage is crucial for optimizing AI API costs and performance. This app provides insights into:
