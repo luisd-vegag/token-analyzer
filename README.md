@@ -22,12 +22,20 @@ Understanding token usage is crucial for optimizing AI API costs and performance
 ### Token Analysis
 - **Text Input Analysis**: Count tokens for plain text stories or documents
 - **PDF Upload Analysis**: Count tokens for PDF documents with the same content
-- **Side-by-Side Comparison**: Visual comparison of token counts between formats
+- **Intelligent Comparison Widget**: Advanced comparison view with percentage differences and insights
 - **Real-time Updates**: Instant token counting as you modify content
+
+### Advanced Token Comparison
+- **Percentage Analysis**: Calculates exact percentage differences between text and PDF token usage
+- **Color-Coded Insights**: Visual indicators showing whether PDF uses more (red), fewer (green), or similar (cyan) tokens
+- **Source Tracking**: Displays whether token counts came from direct analysis or chat interactions
+- **Smart Messaging**: Contextual messages explaining the comparison results
+- **Edge Case Handling**: Proper handling of zero token scenarios and identical counts
 
 ### Interactive Chat
 - **Dual Chat Interface**: Chat with your content in both text and PDF contexts
-- **Token Tracking**: Monitor token usage across chat sessions
+- **Token Tracking**: Monitor token usage across chat sessions with detailed breakdowns
+- **Session-Aware Comparison**: Token comparison updates automatically when chatting
 - **Streaming Responses**: Real-time response streaming from Gemini API
 - **Session Management**: Maintain separate chat sessions for each input format
 
@@ -43,16 +51,42 @@ Understanding token usage is crucial for optimizing AI API costs and performance
 - **Cost Optimization**: Choose the most token-efficient input format for your use case
 - **API Planning**: Better estimate token costs for production applications
 - **Format Selection**: Data-driven decisions on whether to use text extraction or direct PDF processing
+- **Performance Insights**: Understand token overhead from different input modalities
 
 ### For Researchers
-- **Comparative Analysis**: Quantify the token overhead of different input modalities
-- **Performance Metrics**: Understand how format affects model processing
-- **Documentation**: Generate reports on token usage patterns
+- **Comparative Analysis**: Quantify the token overhead of different input modalities with precise percentage calculations
+- **Performance Metrics**: Understand how format affects model processing efficiency
+- **Documentation**: Generate reports on token usage patterns across formats
+- **Statistical Analysis**: Access to absolute differences and percentage calculations
 
 ### For Content Creators
-- **Content Strategy**: Optimize how you present content to AI models
-- **Efficiency Testing**: Test different content formats before production use
+- **Content Strategy**: Optimize how you present content to AI models based on token efficiency
+- **Efficiency Testing**: Test different content formats before production use with real-time feedback
 - **Cost Awareness**: Understand the financial impact of your content format choices
+- **Format Optimization**: Make informed decisions about content delivery methods
+
+## 🔍 Token Comparison Features
+
+The application includes an advanced **Token Usage Comparison** widget that provides:
+
+### Visual Comparison
+- **Percentage Differences**: Shows exact percentage increase or decrease when using PDF vs. text
+- **Color-Coded Results**: 
+  - 🔴 Red: PDF uses significantly more tokens than text
+  - 🟢 Green: PDF uses fewer tokens than text  
+  - 🔵 Cyan: Both formats use approximately the same tokens
+- **Absolute Differences**: Displays the exact token count difference between formats
+
+### Source Attribution
+- **Analysis Source Tracking**: Indicates whether token counts came from:
+  - Direct "Analyze" button usage
+  - First meaningful message in chat sessions
+- **Transparency**: Clear labeling of data sources for accurate interpretation
+
+### Intelligent Messaging
+- **Contextual Insights**: Dynamic messages explaining what the comparison means
+- **Edge Case Handling**: Proper display for scenarios like zero tokens or identical counts
+- **Actionable Information**: Clear guidance on which format is more token-efficient
 
 ## 🛠️ Technical Stack
 
@@ -85,13 +119,16 @@ Understanding token usage is crucial for optimizing AI API costs and performance
 
 5. **Upload a PDF or enter text** to start analyzing token usage
 
+6. **View the comparison** - The Token Usage Comparison widget will automatically appear once you've analyzed both formats
+
 ## 💡 Use Cases
 
-- **API Cost Estimation**: Before implementing PDF processing in production
-- **Content Format Decision**: Choosing between text extraction vs. direct PDF processing
-- **Token Budget Planning**: Understanding token consumption patterns
-- **Performance Optimization**: Identifying the most efficient input format
-- **Educational Tool**: Learning about multimodal AI token usage
+- **API Cost Estimation**: Before implementing PDF processing in production, understand exact token overhead
+- **Content Format Decision**: Use percentage differences to choose between text extraction vs. direct PDF processing
+- **Token Budget Planning**: Understand token consumption patterns with precise metrics
+- **Performance Optimization**: Identify the most efficient input format with quantified results
+- **Educational Tool**: Learn about multimodal AI token usage with visual feedback
+- **A/B Testing**: Compare token efficiency between different content preparation methods
 
 ## 🔒 Privacy & Security
 
@@ -102,4 +139,4 @@ Understanding token usage is crucial for optimizing AI API costs and performance
 
 ---
 
-**Get Started**: Simply run the app, enter your Gemini API key, and start comparing token usage between text and PDF formats!
+**Get Started**: Simply run the app, enter your Gemini API key, analyze both text and PDF formats, and view the intelligent comparison results to optimize your AI API usage!

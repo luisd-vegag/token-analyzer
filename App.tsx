@@ -4,7 +4,8 @@ import { countTokensForText, countTokensForPdf, createChatSession, sendMessageIn
 import { Spinner } from './components/Spinner';
 import { Alert } from './components/Alert';
 import { ChatBox, ChatMessage, ChatTokenDetails } from './components/ChatBox';
-import { BuyMeACoffee } from './components/BuyMeACoffee'; // Import the new component
+import { BuyMeACoffee } from './components/BuyMeACoffee';
+import { TokenComparison } from './components/TokenComparison';
 import type { Chat, Part, GenerateContentResponse } from '@google/genai';
 
 const AVAILABLE_MODELS = ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-pro-preview-05-06', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
@@ -23,8 +24,15 @@ const App: React.FC = () => {
   const [pdfFileName, setPdfFileName] = useState<string>('');
   const [pdfBase64Data, setPdfBase64Data] = useState<string | null>(null);
 
-  const [textTokenCount, setTextTokenCount] = useState<number | null>(null);
-  const [pdfTokenCount, setPdfTokenCount] = useState<number | null>(null);
+  // Token counts from direct "Analyze" button clicks
+  const [directTextTokenCount, setDirectTextTokenCount] = useState<number | null>(null);
+  const [directPdfTokenCount, setDirectPdfTokenCount] = useState<number | null>(null);
+
+  // Token counts for the TokenComparison component
+  const [comparisonTextTokens, setComparisonTextTokens] = useState<number | null>(null);
+  const [comparisonPdfTokens, setComparisonPdfTokens] = useState<number | null>(null);
+  const [isTextComparisonFromChat, setIsTextComparisonFromChat] = useState<boolean>(false);
+  const [isPdfComparisonFromChat, setIsPdfComparisonFromChat] = useState<boolean>(false);
 
   const [isLoadingTextCount, setIsLoadingTextCount] = useState<boolean>(false);
   const [isLoadingPdfCount, setIsLoadingPdfCount] = useState<boolean>(false);
@@ -37,7 +45,7 @@ const App: React.FC = () => {
   const [textChatMessages, setTextChatMessages] = useState<ChatMessage[]>([]);
   const [isTextChatLoading, setIsTextChatLoading] = useState<boolean>(false);
   const [textChatError, setTextChatError] = useState<string | null>(null);
-  const [textChatTokenDetails, setTextChatTokenDetails] = useState<AppChatTokenDetails | null>(null); // Use updated interface
+  const [textChatTokenDetails, setTextChatTokenDetails] = useState<AppChatTokenDetails | null>(null);
   const textChatAbortControllerRef = useRef<AbortController | null>(null);
 
   // PDF Chat State
@@ -45,13 +53,8 @@ const App: React.FC = () => {
   const [pdfChatMessages, setPdfChatMessages] = useState<ChatMessage[]>([]);
   const [isPdfChatLoading, setIsPdfChatLoading] = useState<boolean>(false);
   const [pdfChatError, setPdfChatError] = useState<string | null>(null);
-  const [pdfChatTokenDetails, setPdfChatTokenDetails] = useState<AppChatTokenDetails | null>(null); // Use updated interface
+  const [pdfChatTokenDetails, setPdfChatTokenDetails] = useState<AppChatTokenDetails | null>(null);
   const pdfChatAbortControllerRef = useRef<AbortController | null>(null);
-
-  // Remove BMC script loading logic
-  // const bmcButtonContainerRef = useRef<HTMLDivElement>(null);
-  // useEffect(() => { ... removed BMC script loading ... }, []);
-
 
   const initialChatTokenDetails: AppChatTokenDetails = {
     lastTurnPromptTokens: 0,
@@ -84,8 +87,12 @@ const App: React.FC = () => {
   };
 
   const resetCountsAndError = useCallback(() => {
-    setTextTokenCount(null);
-    setPdfTokenCount(null);
+    setDirectTextTokenCount(null);
+    setDirectPdfTokenCount(null);
+    setComparisonTextTokens(null);
+    setComparisonPdfTokens(null);
+    setIsTextComparisonFromChat(false);
+    setIsPdfComparisonFromChat(false);
     setError(null);
     setApiKeyError(null);
     resetChatStates();
@@ -110,7 +117,9 @@ const App: React.FC = () => {
 
   const handleTextChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     setStoryText(event.target.value);
-    setTextTokenCount(null);
+    setDirectTextTokenCount(null);
+    setComparisonTextTokens(null); // Reset comparison tokens as well
+    setIsTextComparisonFromChat(false);
     setError(null);
     if (textChatSession) {
       setTextChatSession(null);
@@ -126,7 +135,9 @@ const App: React.FC = () => {
       if (file.type === "application/pdf") {
         setPdfFile(file);
         setPdfFileName(file.name);
-        setPdfTokenCount(null);
+        setDirectPdfTokenCount(null);
+        setComparisonPdfTokens(null); // Reset comparison tokens as well
+        setIsPdfComparisonFromChat(false);
         setError(null);
         try {
           const base64Data = await fileToBase64(file);
@@ -168,7 +179,7 @@ const App: React.FC = () => {
 
   const commonApiCallChecks = () => {
     if (!apiKey.trim()) {
-      setApiKeyError("Gemini API Key is required. Please enter it above.");
+      setApiKeyError("Gemini API Key is required. Please enter it above to use API features.");
       return false;
     }
     setApiKeyError(null);
@@ -184,11 +195,14 @@ const App: React.FC = () => {
 
     setIsLoadingTextCount(true);
     setError(null);
-    setTextTokenCount(null);
+    setDirectTextTokenCount(null);
+    setComparisonTextTokens(null); // Also clear comparison before setting
 
     try {
       const count = await countTokensForText(apiKey, selectedModel, storyText);
-      setTextTokenCount(count);
+      setDirectTextTokenCount(count);
+      setComparisonTextTokens(count); // Update comparison with direct analysis result
+      setIsTextComparisonFromChat(false); // Mark as from direct analysis
     } catch (e: any) {
       console.error("Error analyzing text tokens:", e);
       if (e.message.includes("API Key") || e.message.includes("API key") || e.message.includes("permission")) setApiKeyError(e.message);
@@ -207,14 +221,17 @@ const App: React.FC = () => {
 
     setIsLoadingPdfCount(true);
     setError(null);
-    setPdfTokenCount(null);
+    setDirectPdfTokenCount(null);
+    setComparisonPdfTokens(null); // Also clear comparison before setting
 
     try {
       const base64ToUse = pdfBase64Data || await fileToBase64(pdfFile);
       if (!pdfBase64Data) setPdfBase64Data(base64ToUse);
 
       const count = await countTokensForPdf(apiKey, selectedModel, base64ToUse);
-      setPdfTokenCount(count);
+      setDirectPdfTokenCount(count);
+      setComparisonPdfTokens(count); // Update comparison with direct analysis result
+      setIsPdfComparisonFromChat(false); // Mark as from direct analysis
     } catch (e: any) {
       console.error("Error analyzing PDF tokens:", e);
       if (e.message.includes("API Key") || e.message.includes("API key") || e.message.includes("permission")) setApiKeyError(e.message);
@@ -231,8 +248,6 @@ const App: React.FC = () => {
     contextType: 'text' | 'pdf'
   ) => {
     if (!commonApiCallChecks()) {
-      const specificErrorSetter = contextType === 'text' ? setTextChatError : setPdfChatError;
-      specificErrorSetter("API Key is required to start chat. Please enter it above.");
       return;
     }
 
@@ -265,46 +280,54 @@ const App: React.FC = () => {
 
     let turnPromptTokens = 0;
     let turnCandidateTokens = 0;
-    let turnCachedInputTokens = 0; // Initialize cached tokens for the turn
+    let turnCachedInputTokens = 0;
 
     try {
+      const contextData = getContextData();
+      let isFirstMeaningfulMessageInThisTurn = false;
+
       if (!currentSession) {
         const systemInstruction = contextType === 'text'
           ? "You are a helpful AI assistant. The user has provided some text and will ask questions or discuss it."
           : "You are a helpful AI assistant. The user has provided a PDF document and will ask questions or discuss it.";
         currentSession = await createChatSession(apiKey, selectedModel, systemInstruction);
         setSession(currentSession);
-        setTokenDetails({...initialChatTokenDetails}); // Reset session token accumulators
+        setTokenDetails({...initialChatTokenDetails});
+        isFirstMeaningfulMessageInThisTurn = true; // This is the first message in a new session, so it carries context
+      } else {
+        // If session exists, check if this specific message will be the one introducing the primary context
+        // This logic might need refinement if chat history is sent; for now, assume new context = new session or specific check
+        const userMessagesSoFar = (contextType === 'text' ? textChatMessages : pdfChatMessages).filter(m => m.role === 'user');
+        // If it's the first user message being sent in this interaction flow (userMessagesSoFar already includes the current one)
+        if (userMessagesSoFar.length === 1) {
+             isFirstMeaningfulMessageInThisTurn = true;
+        }
       }
 
-      let messageToSend: string | { parts: Part[] };
-      const userMessagesSoFar = (contextType === 'text' ? textChatMessages : pdfChatMessages).filter(m => m.role === 'user');
-      const isFirstMeaningfulMessageInSession = userMessagesSoFar.length <= 1 && (!getSession() || getSession() === currentSession);
 
+      let messageToSend: string | { parts: Part[] };
 
       if (contextType === 'text') {
-        const currentStoryText = getContextData();
-        if (!currentStoryText || !currentStoryText.trim()) {
+        if (!contextData || !contextData.trim()) {
             setErrorState("Please enter some story text to chat about.");
             setLoading(false);
             setUserMessages(prev => prev.filter(m => m.id !== userMessageId));
             return;
         }
-        messageToSend = isFirstMeaningfulMessageInSession
-            ? `Contextual Text:\n"""\n${currentStoryText}\n"""\n\nUser Query: ${message}`
+        messageToSend = isFirstMeaningfulMessageInThisTurn
+            ? `Contextual Text:\n"""\n${contextData}\n"""\n\nUser Query: ${message}`
             : message;
-      } else {
-        const currentPdfData = getContextData();
-        if (!currentPdfData) {
+      } else { // pdf
+        if (!contextData) {
             setErrorState("PDF data is not available for chat. Please re-upload if necessary.");
             setLoading(false);
             setUserMessages(prev => prev.filter(m => m.id !== userMessageId));
             return;
         }
-        if (isFirstMeaningfulMessageInSession) {
+        if (isFirstMeaningfulMessageInThisTurn) {
             messageToSend = {
                 parts: [
-                    { inlineData: { mimeType: 'application/pdf', data: currentPdfData } },
+                    { inlineData: { mimeType: 'application/pdf', data: contextData } },
                     { text: `User Query about the PDF: ${message}` }
                 ]
             };
@@ -331,13 +354,13 @@ const App: React.FC = () => {
           )
         );
         if (chunk.usageMetadata) {
-            if (chunk.usageMetadata.promptTokenCount && turnPromptTokens === 0) {
+            if (chunk.usageMetadata.promptTokenCount && turnPromptTokens === 0) { // Capture first non-zero promptTokenCount for the turn
                 turnPromptTokens = chunk.usageMetadata.promptTokenCount;
             }
-            if (chunk.usageMetadata.cachedContentTokenCount && turnCachedInputTokens === 0) { // Capture cached tokens
+            if (chunk.usageMetadata.cachedContentTokenCount && turnCachedInputTokens === 0) {
                 turnCachedInputTokens = chunk.usageMetadata.cachedContentTokenCount;
             }
-            if (chunk.usageMetadata.candidatesTokenCount) {
+            if (chunk.usageMetadata.candidatesTokenCount) { // Accumulate candidate tokens from all chunks
                 turnCandidateTokens += chunk.usageMetadata.candidatesTokenCount;
             }
         }
@@ -349,13 +372,23 @@ const App: React.FC = () => {
         lastTurnPromptTokens: turnPromptTokens,
         lastTurnCandidateTokens: turnCandidateTokens,
         lastTurnTotalTokens: turnTotalTokens,
-        lastTurnCachedInputTokens: turnCachedInputTokens, // Store last turn cached tokens
+        lastTurnCachedInputTokens: turnCachedInputTokens,
         sessionPromptTokens: (prevDetails?.sessionPromptTokens || 0) + turnPromptTokens,
         sessionCandidateTokens: (prevDetails?.sessionCandidateTokens || 0) + turnCandidateTokens,
         sessionTotalTokens: (prevDetails?.sessionTotalTokens || 0) + turnTotalTokens,
-        sessionCachedInputTokens: (prevDetails?.sessionCachedInputTokens || 0) + turnCachedInputTokens, // Accumulate session cached tokens
+        sessionCachedInputTokens: (prevDetails?.sessionCachedInputTokens || 0) + turnCachedInputTokens,
       }));
 
+      // Update comparison tokens if this was the first meaningful message carrying context
+      if (isFirstMeaningfulMessageInThisTurn && turnPromptTokens > 0) {
+        if (contextType === 'text') {
+          setComparisonTextTokens(turnPromptTokens);
+          setIsTextComparisonFromChat(true);
+        } else if (contextType === 'pdf') {
+          setComparisonPdfTokens(turnPromptTokens);
+          setIsPdfComparisonFromChat(true);
+        }
+      }
 
     } catch (e: any) {
         const errorMessage = e.message || 'Unknown error';
@@ -412,7 +445,7 @@ const App: React.FC = () => {
           />
            <p id="api-key-description" className="mt-2 text-xs text-slate-500">
             Your API Key is used to communicate with the Gemini API and is not stored.
-            {isApiKeyMissing && <span className="block text-yellow-400 mt-1">API Key is required to enable functionality.</span>}
+            {isApiKeyMissing && <span className="block text-yellow-400 mt-1">API Key is required to use API features.</span>}
           </p>
         </div>
         <div>
@@ -423,8 +456,7 @@ const App: React.FC = () => {
                 id="model-select"
                 value={selectedModel}
                 onChange={handleModelChange}
-                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isApiKeyMissing}
+                className="w-full p-3 bg-slate-700 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors text-gray-200"
             >
                 {AVAILABLE_MODELS.map(model => (
                     <option key={model} value={model}>{model}</option>
@@ -432,13 +464,12 @@ const App: React.FC = () => {
             </select>
             <p className="mt-2 text-xs text-slate-500">
                 The selected model will be used for token analysis and chat.
-                 {isApiKeyMissing && <span className="block text-yellow-400 mt-1">Enter API Key to enable model selection.</span>}
             </p>
         </div>
       </div>
 
-      <div className={`grid grid-cols-1 md:grid-cols-2 gap-8 max-w-7xl mx-auto ${isApiKeyMissing ? 'opacity-50 pointer-events-none' : ''}`}>
-        <div className={`bg-slate-800 shadow-2xl rounded-xl p-6 sm:p-8 border border-slate-700 flex flex-col gap-6 transition-opacity`}>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-7xl mx-auto">
+        <div className="bg-slate-800 shadow-2xl rounded-xl p-6 sm:p-8 border border-slate-700 flex flex-col gap-6 transition-opacity">
           <div>
             <h2 className="text-2xl font-semibold mb-4 text-cyan-400 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7 mr-3">
@@ -449,22 +480,21 @@ const App: React.FC = () => {
             <textarea
               value={storyText}
               onChange={handleTextChange}
-              placeholder={isApiKeyMissing ? "Enter API Key to enable functionality." : "Paste your story here..."}
+              placeholder="Paste your story here..."
               rows={8}
               className="w-full p-4 bg-slate-700 border border-slate-600 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 transition-colors text-gray-200 placeholder-slate-500 resize-y"
-              disabled={isApiKeyMissing}
             />
             <button
               onClick={analyzeTextTokens}
-              disabled={isApiKeyMissing || isLoadingTextCount || !storyText.trim()}
+              disabled={isLoadingTextCount || !storyText.trim()}
               className="mt-4 w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               aria-label="Analyze plain text tokens"
             >
               {isLoadingTextCount ? <Spinner /> : 'Analyze Text Tokens'}
             </button>
-            {textTokenCount !== null && (
+            {directTextTokenCount !== null && (
               <div className="mt-4 p-4 bg-slate-700/50 border border-slate-600 rounded-md text-center">
-                <p className="text-lg">Token Count: <span className="font-bold text-2xl text-cyan-400">{textTokenCount}</span></p>
+                <p className="text-lg">Token Count: <span className="font-bold text-2xl text-cyan-400">{directTextTokenCount}</span></p>
               </div>
             )}
           </div>
@@ -473,8 +503,8 @@ const App: React.FC = () => {
             messages={textChatMessages}
             onSendMessage={(msg) => handleSendMessage(msg, 'text')}
             isLoading={isTextChatLoading}
-            isDisabled={isApiKeyMissing || !storyText.trim()}
-            placeholderText={isApiKeyMissing ? "Enter API Key to chat." : !storyText.trim() ? "Enter text above to chat" : "Ask about the text..."}
+            isDisabled={!storyText.trim()}
+            placeholderText={!storyText.trim() ? "Enter text above to chat" : "Ask about the text..."}
             error={textChatError}
             onCloseError={() => setTextChatError(null)}
             onCancel={isTextChatLoading ? () => textChatAbortControllerRef.current?.abort() : undefined}
@@ -482,7 +512,7 @@ const App: React.FC = () => {
           />
         </div>
 
-        <div className={`bg-slate-800 shadow-2xl rounded-xl p-6 sm:p-8 border border-slate-700 flex flex-col gap-6 transition-opacity`}>
+        <div className="bg-slate-800 shadow-2xl rounded-xl p-6 sm:p-8 border border-slate-700 flex flex-col gap-6 transition-opacity">
           <div>
             <h2 className="text-2xl font-semibold mb-4 text-indigo-400 flex items-center">
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-7 h-7 mr-3">
@@ -492,25 +522,25 @@ const App: React.FC = () => {
               Analyze & Chat: PDF Document
             </h2>
             <div className="mb-4">
-              <label htmlFor="pdf-upload" className={`w-full flex flex-col items-center px-4 py-6 bg-slate-700 border-2 border-dashed border-slate-600 rounded-md hover:border-indigo-500 hover:bg-slate-700/70 transition-colors ${isApiKeyMissing ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+              <label htmlFor="pdf-upload" className="w-full flex flex-col items-center px-4 py-6 bg-slate-700 border-2 border-dashed border-slate-600 rounded-md hover:border-indigo-500 hover:bg-slate-700/70 transition-colors cursor-pointer">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-10 h-10 text-slate-500">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25V21a3 3 0 0 1-3 3H7.5a3 3 0 0 1-3-3V7.5a3 3 0 0 1 3-3h4.5m0-3V3m0 0H9.75m3.75 0A3.75 3.75 0 0 1 17.25 6.75v3.75m0 0A3.75 3.75 0 0 1 13.5 14.25H9.75m3.75 0h3.75M3.75 12h16.5" />
                 </svg>
-                <span className="mt-2 text-base leading-normal text-slate-400">{isApiKeyMissing ? "Enter API Key to enable." : pdfFileName || "Select a PDF file"}</span>
-                <input id="pdf-upload" type="file" accept=".pdf" onChange={handlePdfChange} className="hidden" disabled={isApiKeyMissing} />
+                <span className="mt-2 text-base leading-normal text-slate-400">{pdfFileName || "Select a PDF file"}</span>
+                <input id="pdf-upload" type="file" accept=".pdf" onChange={handlePdfChange} className="hidden" />
               </label>
             </div>
             <button
               onClick={analyzePdfTokens}
-              disabled={isApiKeyMissing || isLoadingPdfCount || !pdfFile}
+              disabled={isLoadingPdfCount || !pdfFile}
               className="mt-2 w-full bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-semibold py-3 px-6 rounded-lg shadow-md hover:shadow-lg transition-all duration-300 ease-in-out disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
               aria-label="Analyze PDF document tokens"
             >
               {isLoadingPdfCount ? <Spinner /> : 'Analyze PDF Tokens'}
             </button>
-            {pdfTokenCount !== null && (
+            {directPdfTokenCount !== null && (
               <div className="mt-4 p-4 bg-slate-700/50 border border-slate-600 rounded-md text-center">
-                <p className="text-lg">Token Count: <span className="font-bold text-2xl text-indigo-400">{pdfTokenCount}</span></p>
+                <p className="text-lg">Token Count: <span className="font-bold text-2xl text-indigo-400">{directPdfTokenCount}</span></p>
               </div>
             )}
           </div>
@@ -519,8 +549,8 @@ const App: React.FC = () => {
             messages={pdfChatMessages}
             onSendMessage={(msg) => handleSendMessage(msg, 'pdf')}
             isLoading={isPdfChatLoading}
-            isDisabled={isApiKeyMissing || !pdfFile || !pdfBase64Data}
-            placeholderText={isApiKeyMissing ? "Enter API Key to chat." : !pdfFile ? "Upload PDF to chat" : "Ask about the PDF..."}
+            isDisabled={!pdfFile || !pdfBase64Data}
+            placeholderText={!pdfFile ? "Upload PDF to chat" : "Ask about the PDF..."}
             error={pdfChatError}
             onCloseError={() => setPdfChatError(null)}
             onCancel={isPdfChatLoading ? () => pdfChatAbortControllerRef.current?.abort() : undefined}
@@ -529,12 +559,21 @@ const App: React.FC = () => {
         </div>
       </div>
 
+      <div className="max-w-7xl mx-auto mt-8">
+        <TokenComparison
+          textTokens={comparisonTextTokens}
+          pdfTokens={comparisonPdfTokens}
+          isTextFromChat={isTextComparisonFromChat}
+          isPdfFromChat={isPdfComparisonFromChat}
+        />
+      </div>
+
       <footer className="text-center mt-12 py-6 border-t border-slate-700">
         <p className="text-sm text-slate-500">
           Powered by Gemini API. This tool provides an estimate of token usage and allows contextual chat.
-          {isApiKeyMissing && <span className="block text-yellow-400 mt-1">API Key is required. Please enter your Gemini API Key above.</span>}
+          {isApiKeyMissing && <span className="block text-yellow-400 mt-1">API Key is required to use API features. Please enter your Gemini API Key above.</span>}
         </p>
-        <div className="mt-4"> {/* Container for BMC button */}
+        <div className="mt-4">
            <BuyMeACoffee />
         </div>
       </footer>

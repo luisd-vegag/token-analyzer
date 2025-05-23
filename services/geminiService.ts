@@ -1,6 +1,5 @@
 
 import { GoogleGenAI, Content, Part, Chat, GenerateContentResponse } from "@google/genai";
-// import type { SendMessageStreamRequest } from "@google/genai"; // Not directly used for the fix
 
 
 const validateApiKey = (apiKeyToCheck?: string): string => {
