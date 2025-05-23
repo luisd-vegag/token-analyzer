@@ -7,7 +7,7 @@ import { ChatBox, ChatMessage, ChatTokenDetails } from './components/ChatBox';
 import { BuyMeACoffee } from './components/BuyMeACoffee'; // Import the new component
 import type { Chat, Part, GenerateContentResponse } from '@google/genai';
 
-const AVAILABLE_MODELS = ['gemini-2.5-flash-preview-04-17'];
+const AVAILABLE_MODELS = ['gemini-2.5-flash-preview-05-20', 'gemini-2.5-pro-preview-05-06', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
 
 // Updated ChatTokenDetails to include cached tokens
 interface AppChatTokenDetails extends ChatTokenDetails {
